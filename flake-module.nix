@@ -6,7 +6,6 @@
   ...
 }: let
   inherit (lib.options) mkOption mkEnableOption literalExpression;
-  inherit (lib.modules) mkIf;
   inherit (lib) types;
 
   inherit
@@ -198,7 +197,6 @@ in {
                     // {
                       default = false;
                     };
-
                 }
                 // (mkBasicParams name);
             }
