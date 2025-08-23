@@ -28,7 +28,6 @@
   lib,
   inputs,
   withSystem,
-  flake-hosts,
   ...
 }: let
   inherit (inputs) self;
@@ -400,7 +399,7 @@
       # Provides self' and inputs' from withSystem for accessing system-specific outputs
       (optionals (system != null) (singleton {
         key = "flake-hosts#specialArgs";
-        _file = "${flake-hosts.outPath}/lib.nix";
+        _file = "${__curPos.file}/lib.nix";
         _module.args = withSystem system ({
           self',
           inputs',
@@ -411,14 +410,14 @@
       # Hostname configuration with default priority (can be overridden)
       (singleton {
         key = "flake-hosts#hostname";
-        _file = "${flake-hosts.outPath}/lib.nix";
+        _file = "${__curPos.file}/lib.nix";
         networking.hostName = mkDefault name;
       })
 
       # Nixpkgs platform and source configuration (only for system-based classes)
       (optionals (system != null) (singleton {
         key = "flake-hosts#nixpkgs";
-        _file = "${flake-hosts.outPath}/lib.nix";
+        _file = "${__curPos.file}/lib.nix";
         nixpkgs = {
           hostPlatform = mkDefault system; # Ensures correct platform targeting
           flake.source = nixpkgs.outPath; # Enables flake-aware nixpkgs features
@@ -429,7 +428,7 @@
       # nix-darwin requires nixpkgs.source in addition to nixpkgs.flake.source
       (optionals (class == "darwin") (singleton {
         key = "flake-hosts#nixpkgs-darwin";
-        _file = "${flake-hosts.outPath}/lib.nix";
+        _file = "${__curPos.file}/lib.nix";
         nixpkgs.source = mkDefault nixpkgs;
       }))
     ];

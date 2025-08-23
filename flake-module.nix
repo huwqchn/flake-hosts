@@ -1,4 +1,4 @@
-{flake-hosts}: {
+{
   lib,
   inputs,
   config,
@@ -15,7 +15,6 @@
         lib
         inputs
         withSystem
-        flake-hosts
         ;
     })
     constructSystem
@@ -48,8 +47,6 @@
 in {
   # flake-parts module identifier
   _class = "flake";
-  # re-add `_file` after that gets stripped by `import`. Improves docs and errors
-  _file = "${__curPos.file}";
 
   options = {
     flake-hosts = {
