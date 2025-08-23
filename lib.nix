@@ -435,7 +435,6 @@
   #   - Merges host-specific specialArgs with recursiveUpdate (host takes precedence)
   mkHost = {
     name,
-    path ? null,
     class,
     system,
     modules ? [],
@@ -453,9 +452,6 @@
 
     # Assemble all modules in priority order (later modules can override earlier ones)
     allModules = concatLists [
-      # Host's main configuration file (highest priority for host-specific config)
-      (optionals (path != null) [path])
-
       # Legacy path fallbacks for compatibility with existing projects
       # These are filtered to only include paths that actually exist on the filesystem
       (filter pathExists [
@@ -650,21 +646,6 @@
         }; # Per-architecture configuration function result
       classModules = loadClassModules paths.modulesDir class; # Auto-loaded class-specific modules
 
-      # Reconstruct the path to the host's config file.
-      # This is necessary because we removed `path` from the submodule options
-      # to treat it as an internal implementation detail.
-      path =
-        let
-          # Check for both file and directory forms of the host config.
-          nixFile = "${paths.hostsDir}/${name}.nix";
-          nixDir = "${paths.hostsDir}/${name}";
-        in
-          if lib.pathExists nixFile
-          then nixFile
-          else if lib.pathExists nixDir
-          then nixDir
-          else null;
-
       # Merge all configuration sources using standard logic
       merged = mergeHostSources {
         inherit classConfig archConfig classModules;
@@ -673,7 +654,7 @@
       };
 
       # Prepare final arguments for mkHost by combining all configuration layers
-      hostArgs = hostConfig // {inherit name path;} // merged;
+      hostArgs = hostConfig // {inherit name;} // merged;
     in {
       # Group by class for proper flake output structure
       # This creates the standard flake outputs: nixosConfigurations, darwinConfigurations, etc.
