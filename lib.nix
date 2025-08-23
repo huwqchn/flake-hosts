@@ -228,60 +228,6 @@
     specialArgs = {}; # Could be extended in future for class-specific args
   };
 
-  # Loads and processes a host configuration from a filesystem path.
-  # This handles the complex logic of resolving host files, loading their configuration,
-  # and merging it with inferred system information and standard defaults.
-  #
-  # Parameters:
-  #   basePath (string): Base path to the host (may be file or directory)
-  #
-  # Returns:
-  #   attrset: Complete host configuration with resolved system info
-  #
-  # Path Resolution Logic:
-  #   1. Try basePath directly (Nix can import .nix files or directories with default.nix)
-  #   2. Try basePath + ".nix" (for hosts in the form "hostname" -> "hostname.nix")
-  #   3. If neither exists, create empty configuration
-  #
-  # Configuration Processing:
-  #   1. Import the resolved path to get raw host configuration
-  #   2. Extract class and arch values (with defaults)
-  #   3. Merge with standard defaults and paths
-  #   4. Handle input overrides (nixpkgs, nix-darwin, etc.)
-  #
-  # Special Attributes:
-  #   - path: The actual import path (for mkHost to import)
-  #   - pure: Whether to skip shared configuration (default: false)
-  #   - Input overrides: Allow hosts to specify custom input versions
-  #
-  # This function bridges filesystem discovery (buildHosts) with configuration
-  # processing (mergeHostSources), ensuring all hosts have complete and consistent configuration.
-  #
-  # Related Functions:
-  #   - buildHosts: Calls this function for each discovered host
-  loadHostConfig = basePath: let
-    # Resolve the actual importable path
-    resolved = let
-      # Try as-is first (supports both file.nix and dir/default.nix automatically)
-      directPath = basePath;
-      # Try with .nix extension (hostname -> hostname.nix)
-      nixPath = "${basePath}.nix";
-    in
-      if pathExists directPath
-      then directPath
-      else if pathExists nixPath
-      then nixPath
-      else null; # No valid path found
-
-    # Import the configuration, defaulting to empty if file doesn't exist
-    # This graceful fallback allows hosts to be discovered even without config files
-    hostConfig =
-      if resolved != null
-      then import resolved
-      else {};
-  in
-    hostConfig;
-
   # =============================================================================
   # HOST BUILDING
   # =============================================================================
@@ -739,7 +685,7 @@
       # Second pass: load configuration from filesystem paths
       (lib.mapAttrs' (origName: info: let
         basePath = "${paths.hostsDir}/${info.origName}"; # Full path to host file/directory
-        hostConfig = loadHostConfig basePath; # Handles path resolution and config loading
+        hostConfig = import basePath; # Handles path resolution and config loading
       in
         lib.nameValuePair info.hostName hostConfig)) # Key by clean hostname
 
