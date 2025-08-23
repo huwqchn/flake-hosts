@@ -38,7 +38,7 @@
           enable = true;
           hostsDir = ./hosts;
           modulesDir = ./modules;
-          # systems = null; # Build all systems (default)
+          systems = [ "x86_64-linux" ]; # Only build x86_64-linux systems
         };
         
         # Mix auto-constructed and explicit hosts
