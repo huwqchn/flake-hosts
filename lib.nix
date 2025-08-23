@@ -259,7 +259,6 @@
   #
   # Related Functions:
   #   - buildHosts: Calls this function for each discovered host
-  #   - constructSystem: Used to compute system string from class/arch
   loadHostConfig = basePath: let
     # Resolve the actual importable path
     resolved = let
@@ -280,37 +279,8 @@
       if resolved != null
       then import resolved
       else {};
-
-    # Extract class and arch with defaults
-    class = hostConfig.class or "nixos";
-    arch = hostConfig.arch or "x86_64";
-    system = constructSystem arch class;
   in
-    hostConfig
-    // {
-      # Add resolved class, arch, and system
-      inherit class arch system;
-
-      # Preserve the actual importable path for mkHost
-      # Use resolved path if available, otherwise fall back to basePath
-      path =
-        if resolved != null
-        then resolved
-        else basePath;
-
-      # Standard configuration with defaults
-      modules = hostConfig.modules or []; # Additional modules to include (default: none)
-      specialArgs = hostConfig.specialArgs or {}; # Special arguments for modules (default: none)
-      pure = hostConfig.pure or false; # Skip shared config if true (default: include shared)
-      deployable = hostConfig.deployable or false; # Whether this host is deployable (default: false)
-
-      # Input overrides - allows hosts to specify different input versions
-      # These take precedence over the flake's inputs in mkHost for per-host customization
-      nixpkgs = hostConfig.nixpkgs or null; # Custom nixpkgs input (default: use flake's)
-      nix-darwin = hostConfig.nix-darwin or null; # Custom nix-darwin input (default: use flake's)
-      home-manager = hostConfig.home-manager or null; # Custom home-manager input (default: use flake's)
-      nixOnDroid = hostConfig.nixOnDroid or null; # Custom nixOnDroid input (default: use flake's)
-    };
+    hostConfig;
 
   # =============================================================================
   # HOST BUILDING
@@ -465,7 +435,7 @@
   #   - Merges host-specific specialArgs with recursiveUpdate (host takes precedence)
   mkHost = {
     name,
-    path,
+    path ? null,
     class,
     system,
     modules ? [],
@@ -680,6 +650,21 @@
         }; # Per-architecture configuration function result
       classModules = loadClassModules paths.modulesDir class; # Auto-loaded class-specific modules
 
+      # Reconstruct the path to the host's config file.
+      # This is necessary because we removed `path` from the submodule options
+      # to treat it as an internal implementation detail.
+      path =
+        let
+          # Check for both file and directory forms of the host config.
+          nixFile = "${paths.hostsDir}/${name}.nix";
+          nixDir = "${paths.hostsDir}/${name}";
+        in
+          if lib.pathExists nixFile
+          then nixFile
+          else if lib.pathExists nixDir
+          then nixDir
+          else null;
+
       # Merge all configuration sources using standard logic
       merged = mergeHostSources {
         inherit classConfig archConfig classModules;
@@ -688,7 +673,7 @@
       };
 
       # Prepare final arguments for mkHost by combining all configuration layers
-      hostArgs = hostConfig // {inherit name;} // merged;
+      hostArgs = hostConfig // {inherit name path;} // merged;
     in {
       # Group by class for proper flake output structure
       # This creates the standard flake outputs: nixosConfigurations, darwinConfigurations, etc.

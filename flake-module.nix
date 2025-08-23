@@ -187,13 +187,6 @@ in {
                     '';
                   };
 
-                  path = mkOption {
-                    type = types.nullOr types.path;
-                    default = null;
-                    example = literalExpression "./hosts/myhost";
-                    description = "Path to the directory containing the host files";
-                  };
-
                   deployable =
                     mkEnableOption "Is this host deployable"
                     // {
