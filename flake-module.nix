@@ -198,6 +198,7 @@ in {
                     // {
                       default = false;
                     };
+
                 }
                 // (mkBasicParams name);
             }
@@ -262,8 +263,8 @@ in {
   };
 
   config = {
-    # Auto-construction logic: only use auto.enable
-    flake-hosts.hosts = mkIf cfg.auto.enable (buildHosts cfg);
+    # Auto-construction logic: if auto.enable is true, buildHosts results are merged into cfg.hosts
+    flake-hosts.hosts = lib.mkIf cfg.auto.enable (buildHosts cfg);
 
     flake = mkHosts cfg;
   };
