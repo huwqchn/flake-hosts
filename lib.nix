@@ -31,7 +31,7 @@
   ...
 }: let
   inherit (inputs) self;
-  inherit (builtins) readDir elemAt;
+    inherit (builtins) readDir map foldl' elem;
   inherit
     (lib)
     filter
@@ -47,6 +47,11 @@
     filterAttrs
     mkDefault
     mergeAttrs
+    head
+    mapAttrs'
+    hasSuffix
+    removeSuffix
+    nameValuePair
     ;
 
   # =============================================================================
@@ -112,12 +117,12 @@
   #
   # Example:
   #   findFirstPath [ "./hosts" "./systems" ] => "./hosts" (if it exists first)
-  findFirstPath = candidates: let
-    existing = lib.filter pathExists candidates;
+    findFirstPath = candidates: let
+    existing = filter pathExists candidates;
   in
     if existing == []
     then null
-    else lib.head existing;
+    else head existing;
 
   # Infers standard filesystem paths from configuration with intelligent fallbacks.
   # This implements the "convention over configuration" approach - if paths aren't
@@ -472,11 +477,11 @@
       [hostConfig]
       ++ optionals (!(hostConfig.pure or false)) [classConfig archConfig classModules sharedConfig]; # Conditionally include shared
 
-    # Combine modules from all sources (concatenation allows later modules to override earlier ones)
-    combine = attr: concatLists (builtins.map (x: x.${attr} or []) sources);
+        # Combine modules from all sources (concatenation allows later modules to override earlier ones)
+    combine = attr: concatLists (map (x: x.${attr} or []) sources);
 
     # Deeply merge special arguments (later sources take precedence via recursiveUpdate)
-    combineSpecialArgs = builtins.foldl' recursiveUpdate {} (builtins.map (x: x.specialArgs or {}) sources);
+    combineSpecialArgs = foldl' recursiveUpdate {} (map (x: x.specialArgs or {}) sources);
   in {
     modules = combine "modules";
     specialArgs = combineSpecialArgs;
@@ -529,7 +534,7 @@
           if hostConfig.system == null
           then true
           # For system-based hosts, check if system is in the allowed list
-          else builtins.elem hostConfig.system systemsFilter # Only include if system matches filter
+          else elem hostConfig.system systemsFilter # Only include if system matches filter
       )
       hosts;
 
@@ -661,10 +666,10 @@
           (type
             == "directory"
             || # Directory with default.nix (host as directory)
-            (type == "regular" && lib.hasSuffix ".nix" name)) # .nix file (host as single file)
+            (type == "regular" && hasSuffix ".nix" name)) # .nix file (host as single file)
       )
       hostsDir;
-    # Processing pipeline: normalize -> load -> filter
+    # Processing pipeline: normalize -> load
     # This transforms the filesystem structure into host configurations
   in
     pipe validHosts [
@@ -673,8 +678,8 @@
         # Strip .nix extension for regular files to get clean hostname
         # "server.nix" -> "server", "server/" -> "server"
         hostName =
-          if type == "regular" && lib.hasSuffix ".nix" origName
-          then lib.removeSuffix ".nix" origName
+          if type == "regular" && hasSuffix ".nix" origName
+          then removeSuffix ".nix" origName
           else origName;
       in {
         inherit type;
@@ -683,14 +688,11 @@
       }))
 
       # Second pass: load configuration from filesystem paths
-      (lib.mapAttrs' (origName: info: let
+      (mapAttrs' (origName: info: let
         basePath = "${paths.hostsDir}/${info.origName}"; # Full path to host file/directory
         hostConfig = import basePath; # Handles path resolution and config loading
       in
-        lib.nameValuePair info.hostName hostConfig)) # Key by clean hostname
-
-      # Third pass: apply system filtering to discovered hosts
-      (filterBySystem paths.systemsFilter) # Remove hosts not matching system filter
+        nameValuePair info.hostName hostConfig)) # Key by clean hostname
     ];
   # =============================================================================
   # PUBLIC API EXPORTS
