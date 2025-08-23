@@ -418,7 +418,6 @@
       modules = allModules; # Pass assembled module list to system builder
     };
 
-
   # =============================================================================
   # HOST COLLECTION PROCESSING
   # =============================================================================
@@ -508,31 +507,38 @@
       arch = hostConfig.arch;
 
       # Gather configuration sources following easy-hosts pattern
-      explicitSharedConfig = cfg.hosts.default or { modules = []; specialArgs = {}; };
+      sharedConfig =
+        cfg.hosts.default or {
+          modules = [];
+          specialArgs = {};
+        };
       classConfig = cfg.perClass class; # Call function with class parameter
-      archConfig = cfg.perArch arch; # Call function with arch parameter  
+      archConfig = cfg.perArch arch; # Call function with arch parameter
       classModules = loadClassModules paths.modulesDir class;
-      
+
       # Combine all sources like easy-hosts does
       sources = [
-        explicitSharedConfig
+        sharedConfig
         hostConfig
         classConfig
         archConfig
         classModules
       ];
-      
+
       # Apply pure logic: if host is pure, only use hostConfig
-      filteredSources = if hostConfig.pure or false 
+      filteredSources =
+        if hostConfig.pure or false
         then [hostConfig]
         else sources;
 
       # Prepare final arguments for mkHost by combining all configuration layers
-      hostArgs = hostConfig // {
-        inherit name;
-        modules = concatLists (map (x: x.modules or []) filteredSources);
-        specialArgs = foldl' recursiveUpdate {} (map (x: x.specialArgs or {}) filteredSources);
-      };
+      hostArgs =
+        hostConfig
+        // {
+          inherit name;
+          modules = concatLists (map (x: x.modules or []) filteredSources);
+          specialArgs = foldl' recursiveUpdate {} (map (x: x.specialArgs or {}) filteredSources);
+        };
     in {
       # Group by class for proper flake output structure
       # This creates the standard flake outputs: nixosConfigurations, darwinConfigurations, etc.
@@ -599,9 +605,9 @@
       hostConfig = {
         inherit class arch system;
         # Extract modules from the host configuration and any user-defined modules
-        modules = (rawConfig.modules or []);
+        modules = rawConfig.modules or [];
         # Extract specialArgs from the host configuration
-        specialArgs = (rawConfig.specialArgs or {});
+        specialArgs = rawConfig.specialArgs or {};
         # Preserve other fields like pure
         pure = rawConfig.pure or false;
       };
