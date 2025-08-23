@@ -73,8 +73,8 @@ Per-host keys:
 - `class`: one of `nixos` | `darwin` | `home` | `nixOnDroid`.
 - `arch`: e.g., `x86_64`, `aarch64`.
 - `system`: internal; derived from `(arch, class)` for nixos/darwin; `null` for home/nixOnDroid.
-- `path`: optional module root/file; generally not needed with auto.
 - `pure`: if true, do not merge shared auto config.
+- `deplopable`: is this host deployable?
 - `modules`, `specialArgs`: merged from class/arch/shared and the host (host wins on conflicts).
 - Optional input overrides: `nixpkgs`, `nix-darwin`, `home-manager`, `nixOnDroid`.
 
@@ -127,24 +127,3 @@ See `tests/README.md` for detailed test documentation.
 - Inspired by easy-hosts; behavior aligns with its simplicity goals while keeping flake-parts ergonomics.
 - Keep your configuration pure when needed via `pure = true` on a host.
 - Prefer small, composable modules; use `specialArgs` for values that do not need to resolve module structure.
-
-## Migration Notes
-
-### Templates Removal
-
-Templates are no longer provided. Use `examples/` directory as starting points:
-
-- Copy `examples/simple/` for full-featured setups
-- Copy `examples/minimal/` for basic configurations
-- Previous `nix flake init -t ...` workflows should use direct copying
-
-### Auto Defaults
-
-- `hostsDir` and `modulesDir` now auto-infer when `auto.enable = true`
-- Explicit values still take precedence
-- See Auto Defaults section for discovery logic
-
-### Other Changes
-
-- `getEffectiveConfig`: removed; logic inlined with simpler defaults
-- Class modules: support both `modules/<class>.nix` and `modules/<class>/default.nix` formats
