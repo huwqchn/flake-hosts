@@ -117,6 +117,11 @@ nix flake check             # May show warnings for test configs (expected)
 
 See `tests/README.md` for detailed test documentation.
 
+## Related Projects
+
+- [ehllie/ez-configs](https://github.com/ehllie/ez-configs/tree/main)
+- [tgirlcloud/easy-hosts](https://github.com/tgirlcloud/easy-hosts/tree/main)
+
 ## Notes
 
 - Inspired by easy-hosts; behavior aligns with its simplicity goals while keeping flake-parts ergonomics.
