@@ -29,12 +29,16 @@
   inputs,
   withSystem,
   ...
-}: let
+}:
+let
   inherit (inputs) self;
-  inherit (builtins) readDir map foldl' elem;
-  inherit
-    (lib)
-    filter
+  inherit (builtins)
+    readDir
+    map
+    foldl'
+    elem
+    ;
+  inherit (lib)
     pathExists
     foldAttrs
     pipe
@@ -47,7 +51,6 @@
     filterAttrs
     mkDefault
     mergeAttrs
-    head
     mapAttrs'
     hasSuffix
     removeSuffix
@@ -80,12 +83,14 @@
   #
   # Related Functions:
   #   - Used by flake-module.nix to construct system strings for internal system option
-  constructSystem = arch: class:
-    if class == "darwin"
-    then "${arch}-darwin"
-    else if class == "nixos"
-    then "${arch}-linux"
-    else null; # home and nixOnDroid don't need system strings for their builders
+  constructSystem =
+    arch: class:
+    if class == "darwin" then
+      "${arch}-darwin"
+    else if class == "nixos" then
+      "${arch}-linux"
+    else
+      null; # home and nixOnDroid don't need system strings for their builders
 
   # Note: splitSystem function removed - no longer needed with internal system option
 
@@ -103,7 +108,6 @@
   # - .nix files directly
   # - directories containing default.nix
   # Nix's import system handles this resolution automatically.
-
 
   # Extracts and validates filesystem paths from configuration.
   # Paths must be explicitly set by users - no automatic fallback searching.
@@ -124,20 +128,19 @@
   inferPaths = cfg: {
     # Hosts directory is required for auto-discovery and must be explicitly set
     hostsDir =
-      if cfg.auto.enable
-      then
-        (if cfg.auto.hostsDir != null
-        then cfg.auto.hostsDir
-        else throw "flake-hosts.auto.hostsDir is required when auto.enable = true")
-      else null;
+      if cfg.auto.enable then
+        (
+          if cfg.auto.hostsDir != null then
+            cfg.auto.hostsDir
+          else
+            throw "flake-hosts.auto.hostsDir is required when auto.enable = true"
+        )
+      else
+        null;
 
     # Systems filter for selective building
-    systemsFilter =
-      if cfg.auto.enable
-      then (cfg.auto.systems or null)
-      else null;
+    systemsFilter = if cfg.auto.enable then (cfg.auto.systems or null) else null;
   };
-
 
   # =============================================================================
   # HOST BUILDING
@@ -175,19 +178,22 @@
   # Related Functions:
   #   - mkHost: Uses this function to get the appropriate system builder
   #   - makeStandardModules: Creates compatible modules for the selected builder
-  getSystemBuilder = class: {
-    nixpkgs,
-    nix-darwin ? null,
-    home-manager ? null,
-    nixOnDroid ? null,
-  }:
-    if class == "darwin"
-    then nix-darwin.lib.darwinSystem or (throw "nix-darwin input required for darwin hosts")
-    else if class == "home"
-    then home-manager.lib.homeManagerConfiguration or (throw "home-manager input required for home hosts")
-    else if class == "nixOnDroid"
-    then nixOnDroid.lib.nixOnDroidConfiguration or (throw "nixOnDroid input required for nixOnDroid hosts")
-    else nixpkgs.lib.nixosSystem; # Default for "nixos" class
+  getSystemBuilder =
+    class:
+    {
+      nixpkgs,
+      nix-darwin ? null,
+      home-manager ? null,
+      nixOnDroid ? null,
+    }:
+    if class == "darwin" then
+      nix-darwin.lib.darwinSystem or (throw "nix-darwin input required for darwin hosts")
+    else if class == "home" then
+      home-manager.lib.homeManagerConfiguration or (throw "home-manager input required for home hosts")
+    else if class == "nixOnDroid" then
+      nixOnDroid.lib.nixOnDroidConfiguration or (throw "nixOnDroid input required for nixOnDroid hosts")
+    else
+      nixpkgs.lib.nixosSystem; # Default for "nixos" class
 
   # Generates the standard modules that all flake-hosts managed systems receive.
   # These modules provide consistent behavior across all host classes and handle
@@ -215,23 +221,29 @@
   # Conditional Logic:
   #   - System-specific features only apply when system != null (excludes home/nixOnDroid)
   #   - Darwin gets additional nixpkgs.source configuration
-  makeStandardModules = {
-    name,
-    class,
-    system,
-    nixpkgs,
-  }:
+  makeStandardModules =
+    {
+      name,
+      class,
+      system,
+      nixpkgs,
+    }:
     concatLists [
       # System-specific arguments (only for classes that need system strings)
       # Provides self' and inputs' from withSystem for accessing system-specific outputs
       (optionals (system != null) (singleton {
         key = "flake-hosts#specialArgs";
         _file = "flake-hosts/lib.nix";
-        _module.args = withSystem system ({
-          self',
-          inputs',
-          ...
-        }: {inherit self' inputs';});
+        _module.args = withSystem system (
+          {
+            self',
+            inputs',
+            ...
+          }:
+          {
+            inherit self' inputs';
+          }
+        );
       }))
 
       # Hostname configuration with default priority (can be overridden)
@@ -287,41 +299,43 @@
   # Special Arguments:
   #   - Always includes `inputs` and `self` for module access to flake
   #   - Merges host-specific specialArgs with recursiveUpdate (host takes precedence)
-  mkHost = {
-    name,
-    class,
-    system,
-    modules ? [],
-    specialArgs ? {},
-    ...
-  } @ args: let
-    # Get the appropriate system builder for this class
-    builder = getSystemBuilder class {
-      # Input resolution with multiple fallback names for compatibility
-      nixpkgs = args.nixpkgs or inputs.nixpkgs or (throw "nixpkgs input required"); # Required for all classes
-      nix-darwin = args.nix-darwin or inputs.nix-darwin or inputs.darwin or null; # darwin/nix-darwin variants
-      home-manager = args.home-manager or inputs.home-manager or null; # Optional for home class
-      nixOnDroid = args.nixOnDroid or inputs.droid or inputs.nixOnDroid or null; # nixOnDroid/droid variants
-    };
+  mkHost =
+    {
+      name,
+      class,
+      system,
+      modules ? [ ],
+      specialArgs ? { },
+      ...
+    }@args:
+    let
+      # Get the appropriate system builder for this class
+      builder = getSystemBuilder class {
+        # Input resolution with multiple fallback names for compatibility
+        nixpkgs = args.nixpkgs or inputs.nixpkgs or (throw "nixpkgs input required"); # Required for all classes
+        nix-darwin = args.nix-darwin or inputs.nix-darwin or inputs.darwin or null; # darwin/nix-darwin variants
+        home-manager = args.home-manager or inputs.home-manager or null; # Optional for home class
+        nixOnDroid = args.nixOnDroid or inputs.droid or inputs.nixOnDroid or null; # nixOnDroid/droid variants
+      };
 
-    # Assemble all modules in priority order (later modules can override earlier ones)
-    allModules = concatLists [
-      # Standard flake-hosts integration modules (essential functionality)
-      # These provide hostname, nixpkgs config, and system-specific arguments
-      (makeStandardModules {
-        inherit name class system;
-        nixpkgs = args.nixpkgs or inputs.nixpkgs;
-      })
+      # Assemble all modules in priority order (later modules can override earlier ones)
+      allModules = concatLists [
+        # Standard flake-hosts integration modules (essential functionality)
+        # These provide hostname, nixpkgs config, and system-specific arguments
+        (makeStandardModules {
+          inherit name class system;
+          nixpkgs = args.nixpkgs or inputs.nixpkgs;
+        })
 
-      # User-specified additional modules (host-specific and from config layers)
-      modules
-    ];
-  in
+        # User-specified additional modules (host-specific and from config layers)
+        modules
+      ];
+    in
     builder {
       # Merge standard special arguments with host-specific ones
       # Standard args (inputs, self) are provided to all modules for flake access
       # Host-specific args take precedence via recursiveUpdate
-      specialArgs = recursiveUpdate {inherit inputs self;} specialArgs;
+      specialArgs = recursiveUpdate { inherit inputs self; } specialArgs;
       modules = allModules; # Pass assembled module list to system builder
     };
 
@@ -339,7 +353,7 @@
   #
   # This is equivalent to: foldl' (acc: x: mergeAttrs acc x) {} listOfAttrsets
   # but more efficient for the common case of merging many attribute sets.
-  foldAttrsMerge = foldAttrs mergeAttrs {};
+  foldAttrsMerge = foldAttrs mergeAttrs { };
 
   # Filters a host collection to only include hosts matching specified systems.
   # This implements the auto.systems filtering feature that allows users to build
@@ -361,20 +375,21 @@
   #   - CI/CD: Build only Linux systems on Linux runners
   #   - Development: Build only local architecture during development
   #   - Deployment: Build specific systems for particular deployment phases
-  filterBySystem = systemsFilter: hosts:
-    if systemsFilter == null
-    then hosts # No filtering - include all hosts
+  filterBySystem =
+    systemsFilter: hosts:
+    if systemsFilter == null then
+      hosts # No filtering - include all hosts
     else
       filterAttrs (
         name: hostConfig:
         # Always include hosts without system strings (home-manager, nixOnDroid)
         # These don't have meaningful system strings to filter on
-          if hostConfig.system == null
-          then true
-          # For system-based hosts, check if system is in the allowed list
-          else elem hostConfig.system systemsFilter # Only include if system matches filter
-      )
-      hosts;
+        if hostConfig.system == null then
+          true
+        # For system-based hosts, check if system is in the allowed list
+        else
+          elem hostConfig.system systemsFilter # Only include if system matches filter
+      ) hosts;
 
   # Processes explicitly configured hosts from the flake-hosts.hosts configuration.
   # This handles hosts defined directly in the flake configuration rather than
@@ -403,54 +418,54 @@
   #   - cfg.hosts.default is treated as shared config for explicit hosts
   #   - System/class/arch resolution happens before merging
   #   - Results are grouped by class for proper flake output structure
-  mkHosts = cfg: let
-    paths = inferPaths cfg;
+  mkHosts =
+    cfg:
+    let
+      paths = inferPaths cfg;
 
-    # Process a single explicitly configured host
-    processHost = name: hostConfig: let
-      # Extract system configuration (class, arch, system are guaranteed to be present due to defaults)
-      class = hostConfig.class;
-      arch = hostConfig.arch;
+      # Process a single explicitly configured host
+      processHost =
+        name: hostConfig:
+        let
+          # Extract system configuration (class, arch, system are guaranteed to be present due to defaults)
+          class = hostConfig.class;
+          arch = hostConfig.arch;
 
-      # Gather configuration sources following easy-hosts pattern
-      sharedConfig =
-        cfg.hosts.default or {
-          modules = [];
-          specialArgs = {};
+          # Gather configuration sources following easy-hosts pattern
+          sharedConfig =
+            cfg.hosts.default or {
+              modules = [ ];
+              specialArgs = { };
+            };
+          classConfig = cfg.perClass class; # Call function with class parameter
+          archConfig = cfg.perArch arch; # Call function with arch parameter
+
+          # Combine all sources like easy-hosts does
+          sources = [
+            sharedConfig
+            hostConfig
+            classConfig
+            archConfig
+          ];
+
+          # Apply pure logic: if host is pure, only use hostConfig
+          filteredSources = if hostConfig.pure or false then [ hostConfig ] else sources;
+
+          # Prepare final arguments for mkHost by combining all configuration layers
+          hostArgs = hostConfig // {
+            inherit name;
+            modules = concatLists (map (x: x.modules or [ ]) filteredSources);
+            specialArgs = foldl' recursiveUpdate { } (map (x: x.specialArgs or { }) filteredSources);
+          };
+        in
+        {
+          # Group by class for proper flake output structure
+          # This creates the standard flake outputs: nixosConfigurations, darwinConfigurations, etc.
+          "${class}Configurations".${name} = mkHost hostArgs;
         };
-      classConfig = cfg.perClass class; # Call function with class parameter
-      archConfig = cfg.perArch arch; # Call function with arch parameter
-
-      # Combine all sources like easy-hosts does
-      sources = [
-        sharedConfig
-        hostConfig
-        classConfig
-        archConfig
-      ];
-
-      # Apply pure logic: if host is pure, only use hostConfig
-      filteredSources =
-        if hostConfig.pure or false
-        then [hostConfig]
-        else sources;
-
-      # Prepare final arguments for mkHost by combining all configuration layers
-      hostArgs =
-        hostConfig
-        // {
-          inherit name;
-          modules = concatLists (map (x: x.modules or []) filteredSources);
-          specialArgs = foldl' recursiveUpdate {} (map (x: x.specialArgs or {}) filteredSources);
-        };
-    in {
-      # Group by class for proper flake output structure
-      # This creates the standard flake outputs: nixosConfigurations, darwinConfigurations, etc.
-      "${class}Configurations".${name} = mkHost hostArgs;
-    };
-    # Pipeline: filter -> process -> merge
-    # This transforms the hosts attrset through a series of operations
-  in
+      # Pipeline: filter -> process -> merge
+      # This transforms the hosts attrset through a series of operations
+    in
     pipe cfg.hosts [
       (filterAttrs (name: _: name != "default")) # Remove special shared config entry (not a real host)
       (filterBySystem paths.systemsFilter) # Apply system filtering if specified
@@ -471,58 +486,79 @@
   #   attrset: Host configurations keyed by hostname, compatible with flake-module.nix hosts schema
   #
   # The result can be merged with explicit hosts and processed by mkHosts.
-  buildHosts = cfg: let
-    paths = inferPaths cfg;
-    hostsDir = readDir paths.hostsDir;
+  buildHosts =
+    cfg:
+    let
+      paths = inferPaths cfg;
+      hostsDir = readDir paths.hostsDir;
 
-    # Filter directory entries to only valid host configurations
-    validHosts =
-      filterAttrs (
+      # Load shared configuration from hosts/default.nix if it exists
+      sharedHostConfig = 
+        let
+          defaultPath = "${paths.hostsDir}/default.nix";
+        in
+          if pathExists defaultPath
+          then import defaultPath
+          else { modules = []; specialArgs = {}; };
+
+      # Filter directory entries to only valid host configurations
+      validHosts = filterAttrs (
         name: type:
-          name
-          != "default"
-          && name != "default.nix"
-          && # Reserved for shared config
-          (
-            (type == "regular" && hasSuffix ".nix" name) || # .nix files are valid
-            (type == "directory" && pathExists "${paths.hostsDir}/${name}/default.nix") # directories with default.nix are valid
-          )
-      )
-      hostsDir;
+        name != "default"
+        && name != "default.nix"
+        # Reserved for shared config
+        && (
+          (type == "regular" && hasSuffix ".nix" name)
+          # .nix files are valid
+          || (type == "directory" && pathExists "${paths.hostsDir}/${name}/default.nix") # directories with default.nix are valid
+        )
+      ) hostsDir;
 
-    # Process each discovered host into host configuration
-    processHost = origName: type: let
-      # Normalize filesystem names to host names
-      hostName =
-        if type == "regular" && hasSuffix ".nix" origName
-        then removeSuffix ".nix" origName
-        else origName;
+      # Process each discovered host into host configuration
+      processHost =
+        origName: type:
+        let
+          # Normalize filesystem names to host names
+          hostName =
+            if type == "regular" && hasSuffix ".nix" origName then removeSuffix ".nix" origName else origName;
 
-      # Construct full path to host file/directory
-      basePath = "${paths.hostsDir}/${origName}";
+          # Construct full path to host file/directory
+          basePath = "${paths.hostsDir}/${origName}";
 
-      # Load and normalize host configuration
-      rawConfig = import basePath;
-      class = rawConfig.class or "nixos";
-      arch = rawConfig.arch or "x86_64";
-      system = constructSystem arch class;
+          # Load and normalize host configuration
+          rawConfig = import basePath;
+          class = rawConfig.class or "nixos";
+          arch = rawConfig.arch or "x86_64";
+          system = constructSystem arch class;
 
-      # Create host configuration compatible with flake-module.nix hosts schema
-      # Only extract the modules from the host configuration file
-      hostConfig = {
-        inherit class arch system;
-        # Extract modules from the host configuration and any user-defined modules
-        modules = rawConfig.modules or [];
-        # Extract specialArgs from the host configuration
-        specialArgs = rawConfig.specialArgs or {};
-        # Preserve other fields like pure
-        pure = rawConfig.pure or false;
-      };
-    in {
-      name = hostName;
-      value = hostConfig;
-    };
-  in
+          # Merge shared configuration with host-specific configuration
+          # Skip shared config merging if host is marked as pure
+          isPure = rawConfig.pure or false;
+          mergedModules = 
+            if isPure 
+            then (rawConfig.modules or [])
+            else (sharedHostConfig.modules or []) ++ (rawConfig.modules or []);
+          mergedSpecialArgs = 
+            if isPure
+            then (rawConfig.specialArgs or {})
+            else recursiveUpdate (sharedHostConfig.specialArgs or {}) (rawConfig.specialArgs or {});
+
+          # Create host configuration compatible with flake-module.nix hosts schema
+          hostConfig = {
+            inherit class arch system;
+            # Merge shared and host-specific modules
+            modules = mergedModules;
+            # Merge shared and host-specific specialArgs (host takes precedence)
+            specialArgs = mergedSpecialArgs;
+            # Preserve other fields like pure
+            pure = isPure;
+          };
+        in
+        {
+          name = hostName;
+          value = hostConfig;
+        };
+    in
     # Process all valid hosts (system filtering will be done later in mkHosts)
     mapAttrs' processHost validHosts;
   # =============================================================================
@@ -531,7 +567,8 @@
   # These functions form the public API of the flake-hosts library.
   # They are designed to be called by flake-module.nix to implement
   # the flake-parts integration.
-in {
+in
+{
   # Core system utilities - useful for advanced configurations
   inherit constructSystem;
 
