@@ -492,26 +492,13 @@ let
       paths = inferPaths cfg;
       hostsDir = readDir paths.hostsDir;
 
-      # Load shared configuration from hosts/default.nix if it exists
-      sharedHostConfig = 
-        let
-          defaultPath = "${paths.hostsDir}/default.nix";
-        in
-          if pathExists defaultPath
-          then import defaultPath
-          else { modules = []; specialArgs = {}; };
-
       # Filter directory entries to only valid host configurations
       validHosts = filterAttrs (
         name: type:
-        name != "default"
-        && name != "default.nix"
-        # Reserved for shared config
-        && (
-          (type == "regular" && hasSuffix ".nix" name)
-          # .nix files are valid
-          || (type == "directory" && pathExists "${paths.hostsDir}/${name}/default.nix") # directories with default.nix are valid
-        )
+        # Filter out default directory but allow default.nix for shared config
+        (type == "regular" && hasSuffix ".nix" name)
+        # .nix files are valid
+        || (type == "directory" && pathExists "${paths.hostsDir}/${name}/default.nix") # directories with default.nix are valid
       ) hostsDir;
 
       # Process each discovered host into host configuration
@@ -531,27 +518,9 @@ let
           arch = rawConfig.arch or "x86_64";
           system = constructSystem arch class;
 
-          # Merge shared configuration with host-specific configuration
-          # Skip shared config merging if host is marked as pure
-          isPure = rawConfig.pure or false;
-          mergedModules = 
-            if isPure 
-            then (rawConfig.modules or [])
-            else (sharedHostConfig.modules or []) ++ (rawConfig.modules or []);
-          mergedSpecialArgs = 
-            if isPure
-            then (rawConfig.specialArgs or {})
-            else recursiveUpdate (sharedHostConfig.specialArgs or {}) (rawConfig.specialArgs or {});
-
           # Create host configuration compatible with flake-module.nix hosts schema
-          hostConfig = {
+          hostConfig = rawConfig // {
             inherit class arch system;
-            # Merge shared and host-specific modules
-            modules = mergedModules;
-            # Merge shared and host-specific specialArgs (host takes precedence)
-            specialArgs = mergedSpecialArgs;
-            # Preserve other fields like pure
-            pure = isPure;
           };
         in
         {
