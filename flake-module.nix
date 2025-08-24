@@ -62,35 +62,17 @@ in {
           example = literalExpression "./hosts";
           description = ''
             Directory where host files are located when auto.enable is true.
-            When unset and auto.enable = true, defaults to the first existing of `./hosts` or `./systems`.
+            This option is required when auto.enable = true.
 
             Behavior: Traverses all folders under hostsDir. If it's a nix file, the filename becomes the hostname;
             if it's a folder with default.nix inside, the folder name containing default.nix becomes the hostname.
             default.nix in the hostsDir root folder will be merged into all hosts.
             Supports recursive search for default.nix, stops recursing when default.nix is found.
+
+            Note: Cannot use paths that reference the flake itself (like inputs.self + "/hosts") as this causes infinite recursion.
           '';
         };
 
-        modulesDir = mkOption {
-          type = types.nullOr types.path;
-          default = null;
-          example = literalExpression "./modules";
-          description = ''
-            Directory where class-specific module files are located when auto.enable is true.
-            When null (default), the system will try to infer it as the first existing of `./modules`, `./module`, or `./classes`. If none exist, no automatic class modules are loaded.
-
-            When set (or inferred), the system will automatically look for class-specific modules. A class module can be either
-            - a file: modulesDir/<class>.nix, or
-            - a directory: modulesDir/<class>/default.nix.
-            For directories, the system will look for subdirectories:
-            - modulesDir/nixos/ for NixOS-specific modules
-            - modulesDir/darwin/ for Darwin-specific modules
-            - modulesDir/home/ for Home Manager-specific modules
-            - modulesDir/nixOnDroid/ for Nix-on-Droid-specific modules
-
-            Each class directory should contain a default.nix file with the class-specific configuration.
-          '';
-        };
 
         systems = mkOption {
           type = types.nullOr (types.listOf types.str);

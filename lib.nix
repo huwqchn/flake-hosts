@@ -104,65 +104,31 @@
   # - directories containing default.nix
   # Nix's import system handles this resolution automatically.
 
-  # Finds the first existing path from a list of candidates.
-  # Used for fallback path resolution when multiple standard locations
-  # might contain the desired files (e.g., "./hosts" vs "./systems").
-  #
-  # Parameters:
-  #   candidates (list of strings): Paths to check in order of preference
-  #
-  # Returns:
-  #   string?: First existing path, or null if none exist
-  #
-  # Example:
-  #   findFirstPath [ "./hosts" "./systems" ] => "./hosts" (if it exists first)
-  findFirstPath = candidates: let
-    existing = filter pathExists candidates;
-  in
-    if existing == []
-    then null
-    else head existing;
 
-  # Infers standard filesystem paths from configuration with intelligent fallbacks.
-  # This implements the "convention over configuration" approach - if paths aren't
-  # explicitly specified, it searches for them in standard locations.
+  # Extracts and validates filesystem paths from configuration.
+  # Paths must be explicitly set by users - no automatic fallback searching.
   #
   # Parameters:
   #   cfg (attrset): The flake-hosts configuration from flake-module.nix
   #
   # Returns:
-  #   { hostsDir: string?, modulesDir: string?, systemsFilter: list? }: Resolved paths
+  #   { hostsDir: string?, systemsFilter: list? }: Resolved paths
   #
   # Path Resolution Logic:
-  #   - hostsDir: Explicit cfg.auto.hostsDir, or first of ["./hosts", "./systems"]
-  #   - modulesDir: Explicit cfg.auto.modulesDir, or first of ["./modules", "./module", "./classes", "./class"]
+  #   - hostsDir: Required when auto.enable=true, must be explicitly set
   #   - systemsFilter: Copy of cfg.auto.systems for filtering built hosts
   #
   # Error Handling:
-  #   - hostsDir is required when auto.enable=true, throws error if not found
-  #   - modulesDir is optional, returns null if not found (disables class modules)
+  #   - hostsDir throws error if not set when auto.enable=true
   #   - All paths return null when auto.enable=false
-  #
-  # This function bridges the gap between user configuration and internal path handling.
   inferPaths = cfg: {
-    # Hosts directory is required for auto-discovery
+    # Hosts directory is required for auto-discovery and must be explicitly set
     hostsDir =
       if cfg.auto.enable
       then
-        (cfg.auto.hostsDir or (
-          let
-            found = findFirstPath ["./hosts" "./systems"];
-          in
-            if found != null
-            then found
-            else throw "auto: no hosts directory found; set flake-hosts.auto.hostsDir or create ./hosts or ./systems"
-        ))
-      else null;
-
-    # Modules directory is optional - null disables class-specific module loading
-    modulesDir =
-      if cfg.auto.enable
-      then (cfg.auto.modulesDir or (findFirstPath ["./modules" "./module" "./classes" "./class"]))
+        (if cfg.auto.hostsDir != null
+        then cfg.auto.hostsDir
+        else throw "flake-hosts.auto.hostsDir is required when auto.enable = true")
       else null;
 
     # Systems filter for selective building
@@ -172,65 +138,6 @@
       else null;
   };
 
-  # =============================================================================
-  # MODULE LOADING
-  # =============================================================================
-  # These functions handle the discovery and loading of Nix modules from the filesystem.
-  # They implement the class-specific module system that automatically loads
-  # appropriate modules based on the host's class (nixos, darwin, home, nixOnDroid).
-  # This reduces boilerplate by eliminating the need for manual perClass configuration.
-
-  # Loads class-specific modules from the modulesDir directory.
-  # This implements automatic module loading based on the host's class,
-  # eliminating the need for manual perClass configuration in most cases.
-  #
-  # Parameters:
-  #   modulesDir (string?): Base directory containing class-specific modules
-  #   class (string): Host class ("nixos", "darwin", "home", "nixOnDroid")
-  #
-  # Returns:
-  #   { modules: list, specialArgs: attrset }: Module configuration for this class
-  #
-  # Discovery Logic:
-  #   1. If modulesDir is null, return empty configuration (class modules disabled)
-  #   2. Look for "${modulesDir}/${class}.nix" first (e.g., "./modules/nixos.nix")
-  #   3. Fall back to "${modulesDir}/${class}" directory (e.g., "./modules/nixos/default.nix")
-  #   4. If neither exists, return empty configuration (no class modules for this class)
-  #
-  # This function is called by mergeHostSources for every host to automatically
-  # include class-appropriate modules without explicit configuration.
-  #
-  # Examples:
-  #   - nixos host gets modules from "./modules/nixos.nix" or "./modules/nixos/"
-  #   - darwin host gets modules from "./modules/darwin.nix" or "./modules/darwin/"
-  #
-  # Related Functions:
-  #   - mergeHostSources: Calls this function to gather class-specific configuration
-  #   - inferPaths: Determines the modulesDir directory from configuration
-  loadClassModules = modulesDir: class: let
-    resolved =
-      if modulesDir == null
-      then null
-      else
-        (
-          let
-            # Try .nix file first (e.g., "./modules/nixos.nix")
-            # This pattern allows simpler organization for small class modules
-            nixFile = "${modulesDir}/${class}.nix";
-            # Fall back to directory (e.g., "./modules/nixos/default.nix")
-            # This pattern supports complex class modules with multiple files
-            nixDir = "${modulesDir}/${class}";
-          in
-            if pathExists nixFile
-            then nixFile
-            else if pathExists nixDir
-            then nixDir
-            else null # No class modules found
-        );
-  in {
-    modules = optionals (resolved != null) [resolved];
-    specialArgs = {}; # Could be extended in future for class-specific args
-  };
 
   # =============================================================================
   # HOST BUILDING
@@ -490,7 +397,6 @@
   #   - hostConfig: The explicit host definition
   #   - classConfig: Result of cfg.perClass.${class} function
   #   - archConfig: Result of cfg.perArch.${arch} function
-  #   - classModules: Auto-loaded modules from modulesDir
   #   - sharedConfig: cfg.hosts.default (skipped if host is pure)
   #
   # Special Handling:
@@ -514,7 +420,6 @@
         };
       classConfig = cfg.perClass class; # Call function with class parameter
       archConfig = cfg.perArch arch; # Call function with arch parameter
-      classModules = loadClassModules paths.modulesDir class;
 
       # Combine all sources like easy-hosts does
       sources = [
@@ -522,7 +427,6 @@
         hostConfig
         classConfig
         archConfig
-        classModules
       ];
 
       # Apply pure logic: if host is pure, only use hostConfig
@@ -579,7 +483,10 @@
           != "default"
           && name != "default.nix"
           && # Reserved for shared config
-          (type == "directory" || (type == "regular" && hasSuffix ".nix" name)) # Valid host formats
+          (
+            (type == "regular" && hasSuffix ".nix" name) || # .nix files are valid
+            (type == "directory" && pathExists "${paths.hostsDir}/${name}/default.nix") # directories with default.nix are valid
+          )
       )
       hostsDir;
 
