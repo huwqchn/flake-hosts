@@ -29,7 +29,7 @@
   inputs,
   withSystem,
   ...
-}: let
+} @ top: let
   inherit (inputs) self;
   inherit
     (builtins)
@@ -38,6 +38,7 @@
     elem
     isAttrs
     isList
+    isFunction
     ;
   inherit
     (lib)
@@ -528,7 +529,11 @@
       basePath = "${paths.hostsDir}/${origName}";
 
       # Load and normalize host configuration
-      hostConfig = import basePath;
+      imported = import basePath;
+      hostConfig =
+        if isFunction imported
+        then imported (top // {inherit hostName;})
+        else imported;
     in {
       name = hostName;
       value = hostConfig;
