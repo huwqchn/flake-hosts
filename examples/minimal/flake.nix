@@ -23,7 +23,6 @@
       flake-hosts.auto = {
         enable = true;
         hostsDir = ./hosts;
-        modulesDir = null; # keep minimal; add later if desired
       };
     };
 }

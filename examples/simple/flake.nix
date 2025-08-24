@@ -37,7 +37,6 @@
         auto = {
           enable = true;
           hostsDir = ./hosts;
-          modulesDir = ./modules;
           systems = [ "x86_64-linux" ]; # Only build x86_64-linux systems
         };
         
@@ -57,8 +56,13 @@
           };
         };
 
-        # Per-class configuration is now automatic via modulesDir
-        # Class-specific modules are loaded from ./modules/{class}/default.nix
+        # Per-class configuration using perClass function
+        perClass = class: {
+          modules = [
+            # import the class module, this contains the common configurations between all systems of the same class
+            "${inputs.self}/modules/${class}/default.nix"
+          ];
+        };
       };
     };
 }

@@ -24,7 +24,6 @@
         auto = {
           enable = true;
           hostsDir = ./hosts;
-          modulesDir = ./modules;
         };
       };
     };
